@@ -1,4 +1,4 @@
-﻿# 依赖与构建产物（本作品零依赖，此项为规范保留）
+# 依赖与构建产物（本作品零依赖，此项为规范保留）
 node_modules/
 dist/
 package-lock.json
