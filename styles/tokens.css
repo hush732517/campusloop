@@ -1,0 +1,80 @@
+/* ==================================================================
+   设计令牌 Design Tokens
+   统一定义颜色、间距、圆角、阴影与字体层级，保证全站视觉一致。
+   对应基础要求 8「信息层级清楚、页面风格相对统一」。
+   ================================================================== */
+
+:root {
+  /* ---------- 品牌色 ---------- */
+  --blue-700: #1D4ED8;
+  --blue-600: #2563EB;
+  --blue-500: #3B82F6;
+  --blue-50:  #EFF4FF;
+  --blue-100: #DBE6FF;
+
+  /* ---------- 语义色（状态系统） ---------- */
+  --ok:      #16A34A;
+  --ok-bg:   #E9F9EF;
+  --warn:    #F59E0B;
+  --warn-bg: #FFF5E3;
+  --risk:    #DC2626;
+  --risk-bg: #FEECEC;
+  --live:    #7C3AED;
+  --live-bg: #F3EDFF;
+  --accent:  #0EA5E9;
+  --accent-bg: #E6F6FE;
+  --student: #EA580C;
+  --student-bg: #FFF0E7;
+  --org:     #6D28D9;
+  --org-bg:  #F1ECFE;
+
+  /* ---------- 中性色 ---------- */
+  --bg:      #F6F7FB;
+  --surface: #FFFFFF;
+  --ink:     #111827;
+  --ink-2:   #4B5563;
+  --ink-3:   #6B7280;
+  --ink-4:   #9CA3AF;
+  --line:    #E5E7EB;
+  --line-2:  #F1F2F6;
+
+  /* ---------- 圆角 ---------- */
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  /* ---------- 阴影 ---------- */
+  --sh-1: 0 1px 2px rgba(16, 24, 40, .05);
+  --sh-2: 0 1px 3px rgba(16, 24, 40, .07), 0 1px 2px rgba(16, 24, 40, .04);
+  --sh-3: 0 8px 24px rgba(16, 24, 40, .10);
+  --sh-4: 0 16px 48px rgba(16, 24, 40, .16);
+
+  /* ---------- 间距 ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* ---------- 字体 ---------- */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  --f-xs: 12px;
+  --f-sm: 13px;
+  --f-md: 15px;
+  --f-lg: 17px;
+  --f-xl: 20px;
+  --f-2xl: 24px;
+
+  /* ---------- 动效 ---------- */
+  --ease: cubic-bezier(.32, .72, 0, 1);
+  --t-fast: 140ms;
+  --t-mid: 260ms;
+
+  /* ---------- 布局 ---------- */
+  --maxw: 1120px;
+  --header-h: 56px;
+}
