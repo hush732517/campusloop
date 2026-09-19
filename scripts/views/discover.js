@@ -244,7 +244,7 @@ export function renderDiscover(root, ctx) {
     ${foldedRisk.length ? `<section class="section">${riskFoldHtml(foldedRisk)}</section>` : ''}
 
     <section class="section">
-      ${dataNote(all)}
+      ${dataNote(allMerged())}
     </section>
   `;
 

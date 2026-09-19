@@ -8,9 +8,23 @@
 
 ---
 
+## 〇、提交链接
+
+| 项目 | 链接 |
+| --- | --- |
+| **在线作品（GitHub Pages）** | <https://hush732517.github.io/campusloop/> |
+| **项目仓库** | <https://github.com/hush732517/campusloop> |
+
+在线作品已通过 GitHub Pages 发布，**打开即可直接体验全部页面与核心功能，无需下载或安装任何内容**。
+仓库保持 Public，包含完整源码、README 与运行所需全部文件。
+
+---
+
 ## 一、运行方式
 
 本作品是**零依赖、零构建**的纯前端单页应用，不加载任何 CDN 资源，因此**离线也能运行**。
+
+> 直接点开上面的在线作品链接即可，**无需任何本地环境**。以下步骤仅在需要本地运行或二次开发时使用。
 
 ### 方式 1：本地静态服务器（推荐）
 
@@ -50,13 +64,18 @@ php -S 127.0.0.1:5173
 ### 运行自动化测试（可选）
 
 ```bash
-node docs/selftest.mjs      # 领域模型自测：65 项断言
-node docs/rendertest.mjs    # 渲染冒烟测试：65 项断言
+node docs/selftest.mjs      # 领域模型自测：81 项断言
+node docs/rendertest.mjs    # 渲染冒烟测试：66 项断言
 node docs/flowtest.mjs      # 交互流程测试：55 项断言
 node docs/importcheck.mjs   # 模块与样式一致性：85 项断言
+
+# 真实浏览器端到端校验（需先启动本地服务器，并装有 Edge 或 Chrome）
+node docs/browsertest.mjs http://127.0.0.1:5173   # 28 项断言
 ```
 
-共 **270 项断言**，全部通过。测试不依赖任何第三方库，自带轻量 DOM 桩，无需浏览器。
+前四套共 **287 项断言**，全部通过，不依赖任何第三方库，自带轻量 DOM 桩，无需浏览器。
+`browsertest.mjs` 另外调用真实浏览器抓取**执行 JavaScript 之后**的 DOM，
+用于兜住 DOM 桩无法发现的真实渲染问题（详见 `docs/测试用例.md`）。
 
 ---
 
@@ -263,10 +282,11 @@ campusloop/
 ├─ docs/
 │  ├─ 设计方案.md                       设计方案（先于编码完成）
 │  ├─ 测试用例.md                       人工测试清单（T1—T67）
-│  ├─ selftest.mjs                     领域模型自测（65 项断言）
-│  ├─ rendertest.mjs                   渲染冒烟测试（65 项断言）
+│  ├─ selftest.mjs                     领域模型自测（81 项断言）
+│  ├─ rendertest.mjs                   渲染冒烟测试（66 项断言）
 │  ├─ flowtest.mjs                     交互流程测试（55 项断言）
-│  └─ importcheck.mjs                  导入导出与样式一致性（85 项断言）
+│  ├─ importcheck.mjs                  导入导出与样式一致性（85 项断言）
+│  └─ browsertest.mjs                  真实浏览器端到端校验（28 项断言）
 └─ README.md
 ```
 

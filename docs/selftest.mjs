@@ -10,7 +10,7 @@
 
 import {
   mergeView, computeStatus, missingFields, completenessScore, findClashes,
-  actionLine, publishCheckup, allMerged, visibleMerged, occurrences, isSuperseded
+  actionLine, publishCheckup, allMerged, visibleMerged, occurrences, coveredIds
 } from '../scripts/model.js';
 import { setNow, resetNow, EXAM_NOW } from '../scripts/util.js';
 
@@ -124,24 +124,74 @@ head('T9  9/19 晚 AI 公开课与网安小组应判定冲突');
   if (hit) ok('重叠时长为 60 分钟', hit.overlapMin === 60, `实际 ${hit.overlapMin}`);
 }
 
-head('T10 同一件事不应被当成两条冲突信息，9/21 真实冲突应被识别');
+head('T10 补充通知必须合并进原始通知，而不是替代它');
 {
   const clashes = findClashes(allMerged(), NOW, 14);
   const hit = clashes.find((c) =>
-    [c.a.id, c.b.id].includes('e09') && [c.a.id, c.b.id].includes('e14') && c.day === '2026-09-21');
-  ok('检测到 e09 × e14 冲突（训练营首次训练 vs Git 工作坊）', !!hit);
+    [c.a.id, c.b.id].includes('e01') && [c.a.id, c.b.id].includes('e14') && c.day === '2026-09-21');
+  ok('检测到 e01 × e14 冲突（训练营首次训练 vs Git 工作坊）', !!hit);
   if (hit) ok('重叠时长为 60 分钟', hit.overlapMin === 60, `实际 ${hit.overlapMin}`);
 
-  ok('原始通知 e01 被判定为已被覆盖', isSuperseded('e01') === true);
-  ok('补充通知 e09 未被覆盖', isSuperseded('e09') === false);
-  ok('发现页可见列表中不含 e01', !visibleMerged().some((m) => m.id === 'e01'));
+  // 展示哪一条：补充通知只是修订，不能替代原始通知，否则会丢掉
+  // 只写在原始通知里的信息（报名截止时间、主办方、周期安排）。
+  ok('被合并的补充通知是 e09 与 e20', coveredIds().sort().join(',') === 'e09,e20',
+    coveredIds().join(','));
+  const vis = visibleMerged();
+  ok('可见列表保留原始通知 e01', vis.some((m) => m.id === 'e01'));
+  ok('可见列表保留原始通知 e03', vis.some((m) => m.id === 'e03'));
+  ok('可见列表不含补充通知 e09', !vis.some((m) => m.id === 'e09'));
+  ok('可见列表不含补充通知 e20', !vis.some((m) => m.id === 'e20'));
+
+  // 关键回归：展示用的 e01 必须同时具备
+  //   ① 补充通知带来的新时间与地点  ② 原始通知里的报名截止时间
+  const shown = vis.find((m) => m.id === 'e01');
+  ok('展示卡保留了原始标题', /^“蓝桥杯”程序设计校内训练营$/.test(shown.title), shown.title);
+  ok('展示卡用上了补充通知的新时间 9/21 19:30', shown.time.start === '2026-09-21T19:30', shown.time.start);
+  ok('展示卡用上了补充通知的新地点 实验楼A402', shown.location.raw === '实验楼A402', shown.location.raw);
+  ok('展示卡保留了原始通知的报名截止 9/24 22:00',
+    shown.time.deadline === '2026-09-24T22:00', String(shown.time.deadline));
+  ok('展示卡标记为「已更新」', (shown.changeCount || 0) > 0, String(shown.changeCount));
+  const line = actionLine(shown, NOW);
+  ok('结论行体现新时间而非「截止未注明」',
+    /9 月 21 日/.test(line) && !/报名截止时间未注明|截止未注明/.test(line), line);
+
+  // 双创招募同理：补充说明带来「开发岗已满」，但截止时间仍在原始通知里
+  const dbl = vis.find((m) => m.id === 'e03');
+  ok('双创招募保留了报名截止 9/22 18:00', dbl.time.deadline === '2026-09-22T18:00', String(dbl.time.deadline));
+  ok('双创招募体现开发岗已满', /开发方向名额已满/.test(dbl.recruitNote || ''), dbl.recruitNote);
+
   ok('e01 与 e09 不再互为冲突', !clashes.some((c) =>
     [c.a.id, c.b.id].includes('e01') && [c.a.id, c.b.id].includes('e09')));
-
   // 重叠不足 15 分钟的不提示（如 23:53 结束 vs 23:59 截止），避免噪音淹没真实冲突
   ok('无意义的微小重叠已被忽略', !clashes.some((c) => c.overlapMin < 15));
   ok('冲突组数收敛到可处理范围（≤ 8 组）', clashes.length <= 8, `实际 ${clashes.length}`);
   ok('冲突组数至少 2 组', clashes.length >= 2, `实际 ${clashes.length}`);
+}
+
+head('T10b 状态标签与结论行不得自相矛盾');
+{
+  // 曾经的缺陷：学习小组「报名时间未注明」，状态标签显示「无需报名」，
+  // 结论行却写「需报名（截止未注明）」，同一张卡片自相矛盾。
+  const e06 = mergeView('e06');
+  const st6 = computeStatus(e06, NOW);
+  const line6 = actionLine(e06, NOW);
+  ok('学习小组状态不是「无需报名」', st6.label !== '无需报名', st6.label);
+  ok('学习小组结论行说了要报名', /需报名/.test(line6), line6);
+  ok('状态标签与结论行一致（都要求报名）',
+    !/无需报名/.test(st6.label) && /需报名/.test(line6));
+
+  // 长期招募类同理
+  const e16 = mergeView('e16');
+  const st16 = computeStatus(e16, NOW);
+  ok('摄影志愿者状态体现需要报名', st16.label === '长期可报名', st16.label);
+
+  // 年级展示：全部年级可选时不应罗列「大一、大二、大三、大四」
+  const e12 = mergeView('e12');
+  const line12 = actionLine(e12, NOW);
+  ok('覆盖全部年级时简化为「全校可参加」', /全校可参加/.test(line12), line12);
+  const e13 = mergeView('e13');
+  const line13 = actionLine(e13, NOW);
+  ok('限定年级时仍如实列出（大二、大三、大四）', /大二、大三、大四可参加/.test(line13), line13);
 }
 
 /* ============ 状态机在不同时点的表现 ============ */
@@ -206,7 +256,7 @@ head('T13 数据层完整性');
     student: all.filter((m) => m.source === 'student').length
   };
   ok('三类来源都存在', srcCount.official > 0 && srcCount.org > 0 && srcCount.student > 0, JSON.stringify(srcCount));
-  ok('可见列表为 24 条（26 条去除 2 条被覆盖的原始通知）', visibleMerged().length === 24, `实际 ${visibleMerged().length}`);
+  ok('可见列表为 24 条（26 条去除 2 条已合并的补充通知）', visibleMerged().length === 24, `实际 ${visibleMerged().length}`);
   const known = all.filter((m) => missingFields(m).length > 0).length;
   ok('存在带缺失信息的内容（应被标注）', known >= 8, `实际 ${known}`);
   ok('完整度评分均在 0—100', all.every((m) => { const s = completenessScore(m); return s >= 0 && s <= 100; }));

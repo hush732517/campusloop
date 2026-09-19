@@ -100,6 +100,14 @@ export function computeStatus(m, now = nowISO()) {
     if (deadline && N > parse(deadline)) {
       return { key: 'passed', ...STATUS.passed, note: '后续场次仍可旁听，但报名已截止' };
     }
+    // 需要报名却没有截止时间的周期活动（如「报名时间未注明，满员即止」），
+    // 不能标成「无需报名」——那会与结论行的「需报名（截止未注明）」自相矛盾。
+    if (part.needSignup) {
+      return {
+        key: 'open', ...STATUS.open,
+        note: `下一场 ${smartDay(next)} ${timeOfDay(next)} · 满员即止`
+      };
+    }
     return { key: 'nosignup', ...STATUS.nosignup, note: `下一场 ${smartDay(next)} ${timeOfDay(next)}` };
   }
 
@@ -113,6 +121,10 @@ export function computeStatus(m, now = nowISO()) {
       if (h <= CLOSING_WINDOW_H)
         return { key: 'closing', ...STATUS.closing, note: `有效期剩 ${relTime(deadline, now)}` };
       return { key: 'resource', ...STATUS.resource, note: `有效期至 ${fmtDate(deadline)}` };
+    }
+    // 长期开放但需要报名（如「长期招募，满员即止」）：状态必须体现「要报名」
+    if (part.needSignup) {
+      return { key: 'resource', ...STATUS.resource, label: '长期可报名', note: '截止未注明，满员即止' };
     }
     return { key: 'resource', ...STATUS.resource };
   }
@@ -207,12 +219,6 @@ export function nextOccurrence(m, now = nowISO()) {
  */
 const MIN_OVERLAP_MIN = 15;
 
-/** 该条目是否为「已被补充通知覆盖的原始通知」 */
-export function isSuperseded(id) {
-  const all = [...EVENTS, ...store.get('published')];
-  return all.some((e) => (e.amendments || []).some((a) => a.fromId === id));
-}
-
 /** 判断两条是否属于同一件事（互为修订关系） */
 function sameThing(a, b) {
   if (a.id === b.id) return true;
@@ -253,7 +259,7 @@ export function findClashes(merged, fromISO = nowISO(), days = 14) {
   const items = [];
   merged.forEach((m) => {
     if (m.risk && m.risk.level === 'high') return;         // 高风险折叠内容不参与
-    if (isSuperseded(m.id)) return;                        // 规则①：被补充通知覆盖的原始条目不参与
+    if (m.isCovered) return;                               // 规则①：已合并进原始通知的补充通知不参与
     occurrenceWindows(m, fromISO, horizon).forEach((w) => {
       if (w.start && dateKey(w.start) >= dateKey(fromISO)) {
         items.push({ m, ...w });
@@ -356,38 +362,47 @@ export function mergeView(id) {
 
   merged.changeCount = changes.length;
   merged.changes = changes;
+  merged.coveredIds = (merged.amendedBy || []).map((a) => a.id);
   return merged;
 }
 
 /**
  * 全量合并视图（含用户发布）。
- * 对于「已被补充通知覆盖的原始条目」，会标注 supersededBy 与 updated 标记，
- * 由界面层决定是否展示（发现页与日历默认隐藏，避免同一件事出现两次）。
+ *
+ * 【重要设计决定】
+ * 补充通知本身不是一条可以独立参加的活动，它只是对原始通知的修订。
+ * 因此「原始通知 + 其补充通知」必须合并为**一张卡片**，且卡片要采用
+ * 原始通知的标题（那才是活动名）与「尚未被修订」的字段，
+ * 同时叠加补充通知带来的变更。
+ *
+ * 曾经的做法是保留补充通知作为卡片、隐藏原始通知，结果导致用户的
+ * 「蓝桥杯训练营」卡片丢失了「9月24日22:00报名截止」这一关键信息
+ * （截止时间写在原始通知里，补充通知只说了「报名截止时间不变」）。
+ * 现在改为：显示原始通知（合并后），补充通知作为可从该卡片打开的
+ * 「通知记录」存在。
  */
 export function allMerged() {
-  const ids = [...EVENTS, ...store.get('published')].map((e) => e.id);
-  const all = ids.map(mergeView).filter(Boolean);
+  const all = [...EVENTS, ...store.get('published')].map((e) => mergeView(e.id)).filter(Boolean);
 
-  // m.amendedBy 记录的是「谁修订了我」，因此被修订的条目 id 就是 m.id 本身，
-  // 修订者是 am.id。这里建立「被覆盖的条目 → 覆盖它的补充通知」映射。
-  const superseders = new Map();
-  all.forEach((m) => {
-    (m.amendedBy || []).forEach((am) => superseders.set(m.id, am));
-  });
+  // 被补充通知覆盖的条目 id —— 这些条目不单独展示
+  const coveredIds = new Set();
+  all.forEach((m) => (m.coveredIds || []).forEach((id) => coveredIds.add(id)));
 
-  all.forEach((m) => {
-    const am = superseders.get(m.id);
-    if (am) {
-      m.supersededBy = am.id;
-      m.supersededByTitle = am.title;
-    }
-  });
+  all.forEach((m) => { m.isCovered = coveredIds.has(m.id); });
   return all;
 }
 
-/** 发现页与日历使用的可见列表：排除已被覆盖的原始通知 */
+/**
+ * 发现页与日历使用的可见列表。
+ * 排除「已被合并进原始通知的补充通知」，保留合并后的原始通知。
+ */
 export function visibleMerged() {
-  return allMerged().filter((m) => !m.supersededBy);
+  return allMerged().filter((m) => !m.isCovered);
+}
+
+/** 被补充通知覆盖、因而不单独展示的条目 id（供测试与调试使用） */
+export function coveredIds() {
+  return allMerged().filter((m) => m.isCovered).map((m) => m.id);
 }
 
 /* ==================== 信息缺口与完整度评分 ==================== */
@@ -466,7 +481,10 @@ export function actionLine(m, now = nowISO()) {
   const st = computeStatus(m, now);
 
   // 1) 我能不能参加
-  if (el.grades[0] === 'all') seg.push('全校可参加');
+  const ALL_GRADES = [1, 2, 3, 4];
+  const coversAll = el.grades[0] === 'all'
+    || ALL_GRADES.every((g) => el.grades.includes(g));
+  if (coversAll) seg.push('全校可参加');
   else if (el.grades.length === 1 && el.grades[0] === 1) seg.push('主要面向大一');
   else seg.push(el.grades.map((g) => GRADE_LABELS[g]).join('、') + '可参加');
 

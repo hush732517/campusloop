@@ -20,8 +20,23 @@ import {
 } from '../util.js';
 import { esc, toast, confirmDialog, badge, sourceTag } from '../ui.js';
 
+/**
+ * 把「补充通知」的 id 规范化为它修订的那场活动的 id。
+ * 例如 09（程序设计训练营补充通知）→ 01（“蓝桥杯”程序设计校内训练营）。
+ * 其它情况原样返回。
+ */
+function canonicalId(id) {
+  const raw = rawById(id);
+  const first = raw && raw.amendments && raw.amendments[0];
+  return first && first.fromId ? first.fromId : id;
+}
+
 export function renderDetail(root, ctx, id) {
-  const m = mergeView(id);
+  // 补充通知本身不是一场可参加的活动：如果直接访问它的详情页，
+  // 统一规范化为「它修订的那场活动」的完整视图，避免用户只看到
+  // 「因场地调整……」这类片段而误以为这是一场新活动。
+  const canonical = canonicalId(id);
+  const m = mergeView(canonical);
   if (!m) {
     root.innerHTML = `<div class="empty"><div class="empty__icon">🧭</div>
       <p class="empty__title">没有找到这条信息</p>
@@ -30,6 +45,7 @@ export function renderDetail(root, ctx, id) {
     root.querySelector('[data-act="back"]')?.addEventListener('click', () => ctx.go('#/discover'));
     return;
   }
+  id = canonical;
 
   const now = nowISO();
   store.touchHistory(id);

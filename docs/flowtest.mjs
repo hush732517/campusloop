@@ -418,7 +418,7 @@ head('F7  数据管理：清空本地数据后应用仍正常');
   ok('清空已写入 localStorage', JSON.parse(localStorage.getItem('campusloop.v1')).published.length === 0);
 
   const html = await go('#/discover');
-  ok('清空后发现页仍正常渲染材料', /data-card=/.test(html) && /程序设计训练营补充通知/.test(html));
+  ok('清空后发现页仍正常渲染材料', /data-card=/.test(html) && /“蓝桥杯”程序设计校内训练营/.test(html));
   ok('清空后不再有用户发布内容', !/清空前测试用发布/.test(html));
 }
 
