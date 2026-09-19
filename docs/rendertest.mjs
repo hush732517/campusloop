@@ -286,11 +286,32 @@ head('R8  日历页：按日聚合与冲突高亮');
 {
   const html = await go('#/calendar');
   ok('日历页渲染成功', html.length > 1000);
-  ok('显示时间轴标题', /时间轴/.test(html));
+  ok('显示时间轴标题', /未来 \d+ 天日程/.test(html));
   ok('显示冲突提示卡', /检测到 \d+ 组时间冲突/.test(html) || /没有检测到时间冲突/.test(html));
   ok('存在日期分组', /class="day/.test(html));
-  ok('存在冲突高亮样式类', /slot--clash/.test(html));
   ok('提供时间范围切换', /data-range="14"/.test(html));
+
+  // ---- 图形可视化（本次新增） ----
+  ok('提供图形 / 列表双视图切换', /data-mode="chart"/.test(html) && /data-mode="list"/.test(html));
+  ok('渲染了每日密度条', /class="density"/.test(html) && /density__bar/.test(html));
+  ok('密度条标记了冲突日', /density__col--clash/.test(html));
+  ok('渲染了甘特时间轴', /class="tl[ "]/.test(html) && /tl__lane/.test(html));
+  ok('时间轴带整点刻度', /tl__tick-label/.test(html) && /08:00/.test(html));
+  ok('活动块按时间定位（top/height 内联样式）', /tl-block[^>]*style="top:\d+px;height:\d+px/.test(html));
+  ok('活动块用来源色区分', /tl-block--official/.test(html) && /tl-block--student/.test(html));
+  ok('冲突活动块加了警示样式', /tl-block--clash/.test(html));
+  ok('绘制了冲突时段斜纹色带', /class="tl__overlap"/.test(html));
+  ok('今天绘制了当前时刻线', /class="tl__now"/.test(html) && /现在 \d\d:\d\d/.test(html));
+  ok('重叠活动并排为多列（列宽按列数分）', /width:calc\(50% - 6px\)|width:calc\(100% - 6px\)/.test(html));
+  ok('截止时间与时间轴分开呈现', /class="dl-chip/.test(html) && /报名截止|⏳|⌛/.test(html));
+  ok('提供图例说明', /tl-legend/.test(html) && /时间冲突区/.test(html));
+  ok('提供紧凑 / 全天缩放切换', /data-zoom="compact"/.test(html) && /data-zoom="full"/.test(html));
+  ok('默认使用紧凑缩放', /data-zoom="compact" aria-pressed="true"/.test(html));
+  ok('紧凑模式的刻度对齐整点', /tl__tick-label">\d\d:00</.test(html) && !/tl__tick-label">\d\d:(?!00)\d\d</.test(html));
+
+  // ---- 切到列表模式 ----
+  const list = await go('#/calendar');
+  ok('列表模式可切换（默认图形模式已含切换入口）', /📋 列表明细/.test(list));
 }
 
 head('R9  我的页：持久化与数据管理');

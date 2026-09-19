@@ -485,6 +485,179 @@ a { color: var(--blue-700); }
   padding: var(--s-3); font-size: var(--f-sm); color: #8A5100; margin-top: var(--s-2);
 }
 
+/* ---------------------- 未来 N 天密度条 ---------------------- */
+
+.density {
+  display: flex; align-items: flex-end; gap: 4px;
+  margin-top: var(--s-3); padding: var(--s-3);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--sh-1);
+  height: 118px;
+}
+.density__col {
+  flex: 1 1 0; min-width: 0; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 3px; border-radius: var(--r-sm); padding: 2px 1px;
+  transition: background var(--t-fast);
+}
+.density__col:hover { background: var(--bg); }
+.density__col--today { background: var(--blue-50); }
+.density__val { font-size: 10px; font-weight: 700; color: var(--ink-3); line-height: 1; height: 11px; }
+.density__bar {
+  width: 70%; max-width: 22px; min-height: 3px; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, var(--blue-500), var(--blue-700));
+  transition: height var(--t-mid) var(--ease);
+}
+/* 空白天保留占位，保证所有柱体基线对齐 */
+.density__bar-spacer { flex: 1 1 auto; }
+.density__col--clash .density__bar { background: linear-gradient(180deg, #F87171, var(--risk)); }
+.density__col--clash .density__val { color: var(--risk); }
+.density__wd, .density__day { font-size: 10px; color: var(--ink-4); line-height: 1.1; }
+.density__col--today .density__wd,
+.density__col--today .density__day { color: var(--blue-700); font-weight: 700; }
+
+/* ---------------------- 甘特式时间轴 ---------------------- */
+
+.tl-legend {
+  display: flex; flex-wrap: wrap; gap: var(--s-3);
+  font-size: var(--f-xs); color: var(--ink-3); margin-bottom: var(--s-2);
+}
+.tl-legend__item { display: inline-flex; align-items: center; gap: 5px; }
+.swatch { width: 13px; height: 9px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+.swatch--official { background: var(--blue-700); }
+.swatch--org { background: var(--org); }
+.swatch--student { background: var(--student); }
+.swatch--hatch {
+  background: repeating-linear-gradient(45deg,
+    rgba(220, 38, 38, .55) 0 3px, rgba(220, 38, 38, .12) 3px 6px);
+  border: 1px solid rgba(220, 38, 38, .4);
+}
+.swatch--now { background: var(--risk); height: 3px; border-radius: 2px; }
+
+.tl { position: relative; display: grid; grid-template-columns: 46px 1fr; padding-right: var(--s-3); }
+@media (min-width: 640px) { .tl { grid-template-columns: 56px 1fr; } }
+
+.tl__axis { position: relative; }
+.tl__tick { position: absolute; left: 0; right: 0; height: 0; }
+.tl__tick::after {
+  content: ''; position: absolute; left: 100%;
+  top: 0; width: 100vw; height: 1px; background: var(--line-2);
+}
+.tl__tick-label {
+  position: absolute; right: 8px; top: -6px;
+  font-size: 10px; color: var(--ink-4); font-variant-numeric: tabular-nums;
+}
+
+.tl__lane { position: relative; border-left: 1px solid var(--line); }
+
+/* 被折叠的空白时段：斜纹提示「这里没有安排」，避免被误读为信息缺失 */
+.tl__trim {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(45deg,
+    rgba(107, 114, 128, .07) 0 4px, transparent 4px 9px);
+  border-bottom: 1px dashed var(--line);
+}
+
+/* 冲突时段：斜纹危险色带，横跨整个泳道 —— 撞车的图形证据 */
+.tl__overlap {
+  position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(45deg,
+    rgba(220, 38, 38, .16) 0 5px, rgba(220, 38, 38, .03) 5px 10px);
+  border-top: 1px dashed rgba(220, 38, 38, .5);
+  border-bottom: 1px dashed rgba(220, 38, 38, .5);
+}
+
+/* 活动块：左右边界即开始与结束时间 */
+.tl-block {
+  position: absolute; z-index: 2;
+  border-radius: var(--r-sm); border: 1px solid transparent;
+  background: var(--surface); box-shadow: var(--sh-1);
+  padding: 4px 7px; overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: center;
+  border-left-width: 4px;
+  transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast);
+}
+.tl-block:hover { transform: translateX(2px); box-shadow: var(--sh-3); z-index: 3; }
+.tl-block:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 1px; }
+.tl-block--official { border-left-color: var(--blue-700); background: #F7FAFF; }
+.tl-block--org { border-left-color: var(--org); background: #FAF8FF; }
+.tl-block--student { border-left-color: var(--student); background: #FFF9F5; }
+.tl-block--clash {
+  border-color: var(--risk);
+  background: repeating-linear-gradient(45deg, #FFF5F5 0 6px, #FEECEC 6px 12px);
+}
+.tl-block__title {
+  font-size: var(--f-sm); font-weight: 600; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+.tl-block__meta {
+  font-size: 10px; color: var(--ink-3); margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tl-block--short { padding: 2px 7px; flex-direction: row; align-items: center; gap: 6px; }
+.tl-block--short .tl-block__title {
+  -webkit-line-clamp: 1; white-space: nowrap; text-overflow: ellipsis; display: block;
+}
+.tl-block--short .tl-block__meta { margin-top: 0; flex: 0 0 auto; }
+.tl-block__flag {
+  position: absolute; top: 3px; right: 5px;
+  font-size: 9px; color: var(--ink-4); background: rgba(255, 255, 255, .8);
+  border-radius: 3px; padding: 0 3px;
+}
+/* 超出显示范围的活动：用锯齿轮廓提示「还有内容被裁掉」 */
+.tl-block__cut {
+  position: absolute; left: 0; right: 0; height: 4px;
+  background: repeating-linear-gradient(90deg, var(--ink-4) 0 4px, transparent 4px 8px);
+  opacity: .5;
+}
+.tl-block__cut--top { top: 0; }
+.tl-block__cut--bottom { bottom: 0; }
+
+/* 当前时刻线 */
+.tl__now {
+  position: absolute; left: 0; right: 0; height: 0; z-index: 4; pointer-events: none;
+  border-top: 2px solid var(--risk);
+}
+.tl__now-dot {
+  position: absolute; left: -4px; top: -5px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--risk); box-shadow: 0 0 0 3px rgba(220, 38, 38, .16);
+}
+.tl__now-label {
+  position: absolute; right: 4px; top: -8px;
+  font-size: 10px; font-weight: 700; color: var(--risk);
+  background: var(--surface); padding: 0 4px; border-radius: 3px;
+}
+
+/* 截止时间行：截止不是「要参加的活动」，与时间轴分开呈现 */
+.dl-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: var(--s-2) var(--s-4) var(--s-3);
+  border-top: 1px dashed var(--line);
+  background: #FFFCF6;
+}
+.dl-row--inline { border-top: 1px dashed var(--line); background: none; margin-top: var(--s-2); }
+.dl-chip {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  border: 1px solid #F3D69B; background: var(--warn-bg); color: #8A5100;
+  border-radius: var(--r-pill); padding: 3px 10px;
+  font-size: var(--f-xs); text-align: left;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.dl-chip:hover { background: #FFEFD4; border-color: #E8B96B; }
+.dl-chip--soft { border-color: var(--line); background: var(--line-2); color: var(--ink-2); }
+.dl-chip--soft:hover { background: var(--line); }
+.dl-chip__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-chip__rel { color: var(--ink-3); flex: 0 0 auto; }
+
+@media (max-width: 520px) {
+  .density { height: 96px; padding: var(--s-2); }
+  .density__wd, .density__day { font-size: 9px; }
+  .tl-block__meta { display: none; }
+  .tl-block__title { font-size: var(--f-xs); }
+}
+
 /* ============================ 新生引导 ============================ */
 
 .onboard {

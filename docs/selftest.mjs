@@ -10,7 +10,8 @@
 
 import {
   mergeView, computeStatus, missingFields, completenessScore, findClashes,
-  actionLine, publishCheckup, allMerged, visibleMerged, occurrences, coveredIds
+  actionLine, publishCheckup, allMerged, visibleMerged, occurrences, coveredIds,
+  windowForDay, axisBounds, overlapIntervals, assignColumns, minutesLabel
 } from '../scripts/model.js';
 import { setNow, resetNow, EXAM_NOW } from '../scripts/util.js';
 
@@ -262,6 +263,70 @@ head('T13 数据层完整性');
   ok('完整度评分均在 0—100', all.every((m) => { const s = completenessScore(m); return s >= 0 && s <= 100; }));
   const riskCount = all.filter((m) => m.risk && m.risk.level !== 'none').length;
   ok('识别出 2 条可信度问题内容', riskCount === 2, `实际 ${riskCount}`);
+}
+
+/* ============ 日历可视化布局 ============ */
+head('T14 时间轴布局：定位、列分配与重叠区间');
+{
+  const all = visibleMerged();
+  const day = '2026-09-19';
+
+  // 时间窗：块的上下边界必须严格来自结构化时间
+  const w = windowForDay(mergeView('e10'), day);
+  ok('e10 时间窗 15:00—16:30', w.startMin === 900 && w.endMin === 990, JSON.stringify(w));
+  ok('缺少结束时间时按 90 分钟默认时长推演',
+    (() => { const x = windowForDay(mergeView('e02'), day); return x.startMin === 1140 && x.endMin === 1230; })());
+  ok('不在该日的活动返回 null', windowForDay(mergeView('e10'), '2026-09-20') === null);
+  ok('过短的场次被抬到可见最小高度',
+    (() => { const fake = { time: { start: day + 'T10:00', end: day + 'T10:05' } };
+      const x = windowForDay(fake, day); return x.endMin - x.startMin >= 30; })());
+
+  // 坐标轴范围
+  const ws = all.map((m) => windowForDay(m, day)).filter(Boolean);
+  const b = axisBounds(ws);
+  ok('坐标轴按实际活动收紧（9/19 为 15:00—21:00）', b.lo === 900 && b.hi === 1260, JSON.stringify(b));
+  ok('无活动时退回默认 08:00—23:00',
+    (() => { const x = axisBounds([]); return x.lo === 480 && x.hi === 1380; })());
+  ok('非整点模式只留边距、不取整到整点',
+    (() => { const x = axisBounds([{ startMin: 902, endMin: 1200 }], 480, 1380, false, 20);
+      return x.lo === 882 && x.hi === 1220; })(),
+    JSON.stringify(axisBounds([{ startMin: 902, endMin: 1200 }], 480, 1380, false, 20)));
+  ok('坐标轴会向外取整以容纳早于 8 点的活动',
+    (() => { const x = axisBounds([{ startMin: 420, endMin: 480 }]); return x.lo <= 420; })());
+  ok('坐标轴不会被活动撑出 0—1440',
+    (() => { const x = axisBounds([{ startMin: 0, endMin: 1440 }]); return x.lo >= 0 && x.hi <= 1440; })());
+
+  // 重叠区间：撞车可视化的数据来源
+  const ov = overlapIntervals(ws);
+  ok('9/19 检出 1 段重叠', ov.length === 1, JSON.stringify(ov));
+  ok('重叠区间为 19:30—20:30（AI 公开课与网安小组）',
+    ov[0].start === 1170 && ov[0].end === 1230, JSON.stringify(ov[0]));
+  ok('无重叠时返回空数组', overlapIntervals([{ startMin: 600, endMin: 660 }, { startMin: 660, endMin: 720 }]).length === 0);
+  ok('三场同时重叠只产出一段区间',
+    overlapIntervals([
+      { startMin: 600, endMin: 720 }, { startMin: 610, endMin: 700 }, { startMin: 620, endMin: 680 }
+    ]).length === 1);
+
+  // 列分配：互不重叠的场次应复用同一列
+  const c1 = [{ startMin: 600, endMin: 660 }, { startMin: 660, endMin: 720 }];
+  ok('前后相接的两场复用 1 列', assignColumns(c1) === 1, String(assignColumns(c1)));
+  const c2 = [{ startMin: 600, endMin: 700 }, { startMin: 650, endMin: 750 }];
+  ok('互相重叠的两场分到 2 列', assignColumns(c2) === 2, String(assignColumns(c2)));
+  const c3 = [{ startMin: 600, endMin: 700 }, { startMin: 650, endMin: 750 }, { startMin: 660, endMin: 680 }];
+  ok('三场重叠分到 3 列', assignColumns(c3) === 3, String(assignColumns(c3)));
+  ok('列号从 0 开始连续分配', c2.every((x, i) => x.col === i), JSON.stringify(c2.map((x) => x.col)));
+
+  // 9/19 实际渲染：2 列，且重叠的两场分属不同列
+  const day9 = ws.map((x) => ({ ...x }));
+  const cols = assignColumns(day9);
+  ok('9/19 共 2 列', cols === 2, String(cols));
+  const overlapPair = day9.filter((x) => x.startMin < 1230 && x.endMin > 1170);
+  ok('重叠的两场落在不同列', new Set(overlapPair.map((x) => x.col)).size === overlapPair.length,
+    JSON.stringify(overlapPair.map((x) => x.col)));
+
+  // 刻度标签
+  ok('刻度标签补零', minutesLabel(480) === '08:00' && minutesLabel(1170) === '19:30');
+  ok('24:00 不生成非法 Date', minutesLabel(1440) === '24:00');
 }
 
 /* ============ 汇总 ============ */

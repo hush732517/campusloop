@@ -405,6 +405,124 @@ export function coveredIds() {
   return allMerged().filter((m) => m.isCovered).map((m) => m.id);
 }
 
+/* ==================== 时间轴布局（日历页可视化） ==================== */
+
+/**
+ * 把「分钟」格式化为坐标轴标签。24:00 需要特殊处理，
+ * 因为 1440 分钟并不是合法的 Date，不能走 toISO 那条路。
+ */
+export function minutesLabel(min) {
+  const m = Math.max(0, Math.round(min));
+  if (m >= 1440) return '24:00';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(Math.floor(m / 60))}:${p(m % 60)}`;
+}
+
+/** 取某个活动在指定日期上的时间窗；不在该日返回 null */
+export function windowForDay(m, dayKey, defaultMinutes = 90) {
+  const t = m.time || {};
+  const startMs = parse(t.start);
+  if (!Number.isFinite(startMs)) return null;
+  if (dateKey(t.start) !== dayKey) return null;
+
+  const startMin = minutesOf(t.start);
+  let endMin;
+  if (t.end) {
+    endMin = dateKey(t.end) === dayKey
+      ? minutesOf(t.end)
+      // 跨天活动（如 8:30—次日）在当天只画到 24:00
+      : 1440;
+  } else {
+    endMin = startMin + (t.durationMin || defaultMinutes);
+  }
+  // 保证有最小可见高度，否则 15 分钟的场次无法显示与点击
+  if (endMin - startMin < 30) endMin = startMin + 30;
+  return { startMin, endMin, endISO: t.end || null };
+}
+
+/**
+ * 计算时间轴显示范围。
+ * @param windows 该范围要容纳的时间窗
+ * @param defStart 兜底起点（无活动时使用），默认 8:00
+ * @param defEnd   兜底终点（无活动时使用），默认 23:00
+ * @param padSnap  true：向外取整到整点（刻度整齐）；false：只留 padMin 的边距
+ *                 （紧凑模式用，尽量不浪费垂直空间）
+ * @param padMin   非整点模式下的上下留白
+ */
+export function axisBounds(windows, defStart = 8 * 60, defEnd = 23 * 60, padSnap = true, padMin = 20) {
+  if (!windows.length) return { lo: defStart, hi: defEnd, span: defEnd - defStart };
+
+  let lo = Infinity, hi = -Infinity;
+  windows.forEach((w) => {
+    if (w.startMin < lo) lo = w.startMin;
+    if (w.endMin > hi) hi = w.endMin;
+  });
+
+  if (padSnap) {
+    lo = Math.floor(lo / 60) * 60;
+    hi = Math.ceil(hi / 60) * 60;
+  } else {
+    lo -= padMin;
+    hi += padMin;
+  }
+
+  lo = Math.max(0, lo);
+  hi = Math.min(1440, hi);
+  if (hi - lo < 60) hi = Math.min(1440, lo + 60);
+  return { lo, hi, span: hi - lo };
+}
+
+/**
+ * 重叠区间：返回该组时间窗中「同时有 ≥2 个活动」的时间段。
+ * 这是撞车可视化的数据来源——用斜纹色带把真实重叠的时间段标出来，
+ * 用户不需要读文字就能看到哪一段被两场活动占用了。
+ */
+export function overlapIntervals(windows) {
+  const marks = [];
+  windows.forEach((w) => {
+    marks.push({ at: w.startMin, d: 1 });
+    marks.push({ at: w.endMin, d: -1 });
+  });
+  marks.sort((a, b) => a.at - b.at || a.d - b.d);
+
+  const out = [];
+  let depth = 0, from = null;
+  for (let i = 0; i < marks.length; i++) {
+    const before = depth;
+    depth += marks[i].d;
+    if (before < 2 && depth >= 2) {
+      from = marks[i].at;
+    } else if (before >= 2 && depth < 2 && from != null) {
+      // 与上一个区间相接则合并，避免出现零碎的窄条
+      const last = out[out.length - 1];
+      if (last && last.end === from) last.end = marks[i].at;
+      else out.push({ start: from, end: marks[i].at });
+      from = null;
+    }
+  }
+  return out.filter((iv) => iv.end > iv.start);
+}
+
+/**
+ * 列分配：把互相重叠的时间窗分到不同列，互不重叠的复用同一列。
+ * 采用区间图贪心着色（按开始时间排序，放入第一个不冲突的列），
+ * 这样并排显示的块数 = 该时段最大并发数，横向空间利用最优。
+ * @returns {number} 实际用到的列数
+ */
+export function assignColumns(windows) {
+  const ends = [];   // 每一列当前的结束时间
+  windows.forEach((w) => {
+    let placed = -1;
+    for (let i = 0; i < ends.length; i++) {
+      if (ends[i] <= w.startMin) { placed = i; break; }
+    }
+    if (placed < 0) { ends.push(w.endMin); placed = ends.length - 1; }
+    else ends[placed] = w.endMin;
+    w.col = placed;
+  });
+  return Math.max(1, ends.length);
+}
+
 /* ==================== 信息缺口与完整度评分 ==================== */
 
 /**

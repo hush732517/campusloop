@@ -118,12 +118,28 @@ head('B5  详情页与日历页的核心内容');
   ok('详情页有报名操作', /我要报名/.test(d));
 
   const c = dumpDom(`${BASE}/index.html#/calendar`);
-  ok('日历页显示时间轴', /时间轴/.test(c));
   ok('日历页有日期分组', /class="day/.test(c));
 
   const p = dumpDom(`${BASE}/index.html#/publish`);
   ok('发布页显示体检面板', /发布体检（实时）/.test(p));
   ok('发布页有三个步骤', /class="step/.test(p));
+}
+
+head('B6  日历页图形可视化（真实浏览器）');
+{
+  const c = dumpDom(`${BASE}/index.html#/calendar`);
+  ok('渲染了每日密度条', /class="density"/.test(c) && /density__bar/.test(c));
+  ok('密度条标记了冲突日', /density__col--clash/.test(c));
+  ok('渲染了甘特时间轴泳道', /tl__lane/.test(c));
+  ok('时间轴有整点刻度标签', /tl__tick-label/.test(c) && /\d\d:00/.test(c));
+  ok('活动块带定位样式（top/height）', /tl-block[^>]*style="top:\d+px;height:\d+px/.test(c));
+  ok('重叠活动并排（列宽 50%）', /width:calc\(50% - 6px\)/.test(c));
+  ok('冲突时段斜纹色带已绘制', /class="tl__overlap"/.test(c));
+  ok('今天有当前时刻线', /class="tl__now"/.test(c));
+  ok('图例说明存在', /时间冲突区/.test(c));
+  ok('截止时间独立成行', /class="dl-chip/.test(c));
+  ok('提供紧凑 / 全天缩放切换', /data-zoom="compact"/.test(c) && /data-zoom="full"/.test(c));
+  ok('列表模式入口存在', /data-mode="list"/.test(c));
 }
 
 rmSync(profile, { recursive: true, force: true });
