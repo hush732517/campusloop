@@ -305,7 +305,11 @@ function blockHtml(s, d, bounds, clashKeys, now) {
   const w = 100 / d.cols;
   const cutTop = s.startMin < bounds.lo;
   const cutBottom = s.endMin > bounds.hi;
-  const shortCls = h < 44 ? ' tl-block--short' : '';
+  // 只有高度真的放不下两行时才并排显示（标题在左、时间在右）。
+  // 阈值原先写成 44px，导致 42px 这种完全放得下两行的块也被并排，
+  // 标题与时间被推到块的两端、中间留出大片空白，看起来像排版错乱。
+  // 实测两行所需高度约 32px（标题 17px + 时间 13px + 内边距），故取 32。
+  const shortCls = h < 32 ? ' tl-block--short' : '';
 
   const timeText = `${minutesLabel(s.startMin)}—${minutesLabel(s.endMin)}`;
 
