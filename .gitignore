@@ -1,0 +1,16 @@
+﻿# 依赖与构建产物（本作品零依赖，此项为规范保留）
+node_modules/
+dist/
+package-lock.json
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志与临时文件
+*.log
+_d.mjs
+_dbg*.mjs
